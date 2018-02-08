@@ -13,13 +13,22 @@
 # limitations under the License.
 
 import datetime
+import json
+import os
 
 import mock
-import pytest
 
 from google.auth import _helpers
 from google.auth import transport
 from google.oauth2 import credentials
+
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
+
+AUTH_USER_JSON_FILE = os.path.join(DATA_DIR, 'authorized_user.json')
+
+with open(AUTH_USER_JSON_FILE, 'r') as fh:
+    AUTH_USER_INFO = json.load(fh)
 
 
 class TestCredentials(object):
@@ -47,11 +56,6 @@ class TestCredentials(object):
         assert credentials.token_uri == self.TOKEN_URI
         assert credentials.client_id == self.CLIENT_ID
         assert credentials.client_secret == self.CLIENT_SECRET
-
-    def test_create_scoped(self):
-        credentials = self.make_credentials()
-        with pytest.raises(NotImplementedError):
-            credentials.with_scopes(['email'])
 
     @mock.patch('google.oauth2._client.refresh_grant', autospec=True)
     @mock.patch(
@@ -90,3 +94,42 @@ class TestCredentials(object):
         # Check that the credentials are valid (have a token and are not
         # expired)
         assert credentials.valid
+
+    def test_from_authorized_user_info(self):
+        info = AUTH_USER_INFO.copy()
+
+        creds = credentials.Credentials.from_authorized_user_info(info)
+        assert creds.client_secret == info['client_secret']
+        assert creds.client_id == info['client_id']
+        assert creds.refresh_token == info['refresh_token']
+        assert creds.token_uri == credentials._GOOGLE_OAUTH2_TOKEN_ENDPOINT
+        assert creds.scopes is None
+
+        scopes = ['email', 'profile']
+        creds = credentials.Credentials.from_authorized_user_info(
+            info, scopes)
+        assert creds.client_secret == info['client_secret']
+        assert creds.client_id == info['client_id']
+        assert creds.refresh_token == info['refresh_token']
+        assert creds.token_uri == credentials._GOOGLE_OAUTH2_TOKEN_ENDPOINT
+        assert creds.scopes == scopes
+
+    def test_from_authorized_user_file(self):
+        info = AUTH_USER_INFO.copy()
+
+        creds = credentials.Credentials.from_authorized_user_file(
+            AUTH_USER_JSON_FILE)
+        assert creds.client_secret == info['client_secret']
+        assert creds.client_id == info['client_id']
+        assert creds.refresh_token == info['refresh_token']
+        assert creds.token_uri == credentials._GOOGLE_OAUTH2_TOKEN_ENDPOINT
+        assert creds.scopes is None
+
+        scopes = ['email', 'profile']
+        creds = credentials.Credentials.from_authorized_user_file(
+            AUTH_USER_JSON_FILE, scopes)
+        assert creds.client_secret == info['client_secret']
+        assert creds.client_id == info['client_id']
+        assert creds.refresh_token == info['refresh_token']
+        assert creds.token_uri == credentials._GOOGLE_OAUTH2_TOKEN_ENDPOINT
+        assert creds.scopes == scopes
